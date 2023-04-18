@@ -1,0 +1,839 @@
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from keras.layers import Conv2D, MaxPool2D, Bidirectional,AveragePooling2D, LSTM, Reshape ,Input, BatchNormalization, MaxPooling2D, Activation, Flatten, Dense, Dropout
+from keras.models import Sequential
+from keras.utils import np_utils,to_categorical
+from sklearn.metrics import classification_report
+from imblearn.over_sampling import RandomOverSampler 
+from keras.preprocessing import image
+import scipy
+import os
+import cv2
+import pandas as pd
+import numpy as np
+
+import seaborn as sns
+import matplotlib.image as mpimg
+import pickle
+
+from tensorflow.keras.models import Model
+from tensorflow.keras.applications import InceptionV3
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import *
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+from sklearn.preprocessing import StandardScaler , LabelEncoder
+from sklearn import preprocessing
+
+from tensorflow.keras.applications import VGG16, InceptionResNetV2
+from keras import regularizers
+from tensorflow.keras.optimizers import Adam 
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import optimizers
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras.layers import Dropout, BatchNormalization, LeakyReLU, Activation
+from tensorflow.keras.callbacks import Callback, EarlyStopping, ReduceLROnPlateau
+from keras.utils import np_utils
+import scikitplot as skplt
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import accuracy_score
+
+
+# Read CSV data set
+
+train_data = pd.read_csv('csv path')
+train_data.shape
+
+# test data path
+test_data = pd.read_csv('test.csv')
+
+#Label fro the emotion 
+lable_insert  = {0:'anger', 1:'disgust', 2:'fear', 3:'happiness', 4: 'sadness', 5: 'surprise', 6: 'neutral'}
+
+# Plot the emotion 
+fig = plt.figure(1, (14, 14))
+
+k = 0
+for label in sorted(train_data.emotion.unique()):
+    for j in range(7):
+        px = train_data[train_data.emotion==label].pixels.iloc[k]
+        px = np.array(px.split(' ')).reshape(48, 48).astype('float32')
+
+        k += 1
+        ax = plt.subplot(7, 7, k)
+        ax.imshow(px, cmap='gray')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_title(emotion_label[label])
+        plt.tight_layout()
+        
+        
+#insert the data to the emotion
+
+train_data = train_data[train_data.emotion.isin(lable_insert)]
+train_data.shape 
+
+
+#Reshape the image on the train data
+
+img_array = train_data.pixels.apply(lambda x: np.array(x.split(' ')).reshape(48, 48, 1).astype('float32'))
+img_array = np.stack(img_array, axis=0)
+
+#Encodeing the the emotion label
+
+lab_en = LabelEncoder()
+img_labels = lab_en.fit_transform(train_data.emotion)
+img_labels = np_utils.to_categorical(img_labels)
+img_labels.shape
+
+
+Method :
+*Describe the Methodology: *
+
+The initial phase is to gather and preprocess data. In the case of emotion recognition, this entails gathering the data such as facial expressions,
+giving them the corresponding emotional tags. Pre-processing may require a number of tasks to be carried out such as data cleansing, standardization,
+and feature extraction.
+
+DCNN :
+
+# Split the data into training and testing
+X_train, X_valid, y_train, y_valid = train_test_split(img_array, img_labels,
+                                                    shuffle=True, stratify=img_labels,
+                                                    test_size=0.3, random_state=42)
+X_train.shape, X_valid.shape, y_train.shape, y_valid.shape
+
+img_width = X_train.shape[1]
+img_height = X_train.shape[2]
+img_depth = X_train.shape[3]
+num_classes = y_train.shape[1]
+
+# Normalizing results, as neural networks are very sensitive to unnormalized data.
+X_train = X_train / 255.
+X_valid = X_valid / 255.
+
+
+def build_net(optim):
+    """
+    This is a Deep Convolutional Neural Network (DCNN). 
+    """
+    net = Sequential(name='DCNN')
+
+    net.add(
+        Conv2D(
+            filters=64,
+            kernel_size=(3,3),
+            input_shape=(img_width, img_height, img_depth),
+            activation='elu',
+            padding='same',
+            kernel_initializer='he_normal',
+            name='conv2d_1'
+        )
+    )
+    net.add(BatchNormalization(name='batchnorm_1'))
+    net.add(
+        Conv2D(
+            filters=64,
+            kernel_size=(3,3),
+            activation='elu',
+            padding='same',
+            kernel_initializer='he_normal',
+            name='conv2d_2'
+        )
+    )
+    net.add(BatchNormalization(name='batchnorm_2'))
+    
+    net.add(MaxPooling2D(pool_size=(2,2), name='maxpool2d_1'))
+    net.add(Dropout(0.4, name='dropout_1'))
+
+    net.add(
+        Conv2D(
+            filters=128,
+            kernel_size=(3,3),
+            activation='elu',
+            padding='same',
+            kernel_initializer='he_normal',
+            name='conv2d_3'
+        )
+    )
+    net.add(BatchNormalization(name='batchnorm_3'))
+    net.add(
+        Conv2D(
+            filters=128,
+            kernel_size=(3,3),
+            activation='elu',
+            padding='same',
+            kernel_initializer='he_normal',
+            name='conv2d_4'
+        )
+    )
+    net.add(BatchNormalization(name='batchnorm_4'))
+    
+    net.add(MaxPooling2D(pool_size=(2,2), name='maxpool2d_2'))
+    net.add(Dropout(0.4, name='dropout_2'))
+
+    net.add(
+        Conv2D(
+            filters=256,
+            kernel_size=(3,3),
+            activation='elu',
+            padding='same',
+            kernel_initializer='he_normal',
+            name='conv2d_5'
+        )
+    )
+    net.add(BatchNormalization(name='batchnorm_5'))
+    net.add(
+        Conv2D(
+            filters=256,
+            kernel_size=(3,3),
+            activation='elu',
+            padding='same',
+            kernel_initializer='he_normal',
+            name='conv2d_6'
+        )
+    )
+    net.add(BatchNormalization(name='batchnorm_6'))
+    
+    net.add(MaxPooling2D(pool_size=(2,2), name='maxpool2d_3'))
+    net.add(Dropout(0.5, name='dropout_3'))
+
+    net.add(Flatten(name='flatten'))
+        
+    net.add(
+        Dense(
+            128,
+            activation='elu',
+            kernel_initializer='he_normal',
+            name='dense_1'
+        )
+    )
+    net.add(BatchNormalization(name='batchnorm_7'))
+    
+    net.add(Dropout(0.6, name='dropout_4'))
+    
+    net.add(
+        Dense(
+            num_classes,
+            activation='softmax',
+            name='out_layer'
+        )
+    )
+    
+    net.compile(
+        loss='categorical_crossentropy',
+        optimizer=optim,
+        metrics=['accuracy']
+    )
+    
+    net.summary()
+    
+    return net
+   
+   
+   
+   
+from tensorflow.keras.callbacks import EarlyStopping ,ReduceLROnPlateau
+"""
+I used two callbacks one is `early stopping` for avoiding overfitting training data
+and other `ReduceLROnPlateau` for learning rate.
+"""
+
+early_stopping = EarlyStopping(
+    monitor='val_accuracy',
+    min_delta=0.00005,
+    patience=11,
+    verbose=1,
+    restore_best_weights=True,
+)
+
+lr_scheduler = ReduceLROnPlateau(
+    monitor='val_accuracy',
+    factor=0.5,
+    patience=7,
+    min_lr=1e-7,
+    verbose=1,
+)
+
+callbacks = [
+    early_stopping,
+    lr_scheduler,
+]
+
+
+
+# As the data in hand is less as compared to the task so ImageDataGenerator is good to go.
+train_datagen = ImageDataGenerator(
+    rotation_range=15,
+    width_shift_range=0.15,
+    height_shift_range=0.15,
+    shear_range=0.15,
+    zoom_range=0.15,
+    horizontal_flip=True,
+)
+train_datagen.fit(X_train)
+
+
+batch_size = 32 #batch size of 32 performs the best.
+epochs = 50
+optims = [
+    optimizers.Nadam(learning_rate=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-07, name='Nadam'),
+    optimizers.Adam(0.001),
+]
+
+# I tried both `Nadam` and `Adam`, the difference in results is not different but I finally went with Nadam as it is more popular.
+model = build_net(optims[1]) 
+history = model.fit_generator(
+    train_datagen.flow(X_train, y_train, batch_size=batch_size),
+    validation_data=(X_valid, y_valid),
+    steps_per_epoch=len(X_train) / batch_size,
+    epochs=epochs,
+    callbacks=callbacks,
+    use_multiprocessing=True
+)
+
+
+sns.set()
+fig = plt.figure(0, (12, 4))
+
+ax = plt.subplot(1, 2, 1)
+sns.lineplot( history.history['accuracy'], label='train')
+sns.lineplot( history.history['val_accuracy'], label='valid')
+plt.title('Accuracy')
+plt.tight_layout()
+
+ax = plt.subplot(1, 2, 2)
+sns.lineplot( history.history['loss'], label='train')
+sns.lineplot( history.history['val_loss'], label='valid')
+plt.title('Loss')
+plt.tight_layout()
+
+plt.show()
+
+
+
+y_test_arg=np.argmax(y_valid,axis=1)
+Y_pred = np.argmax(model.predict(X_valid),axis=1)
+
+skplt.metrics.plot_confusion_matrix(Y_pred,y_test_arg,figsize=(7,7))
+
+print('Confusion Matrix')
+print(confusion_matrix(y_test_arg, Y_pred))
+
+
+from sklearn.metrics import confusion_matrix, classification_report
+print(classification_report(y_test_arg, Y_pred))
+
+
+# Save the predicted emotion labels to a CSV file
+resultsDF = pd.DataFrame({'id': id, 'emotion': Y_pred})
+resultsDF.to_csv('results_prediction.csv',index=False)
+
+
+
+CNN
+A Convolutional Neural Network (CNN) model was developed. The model accepts 1D data as input, and the first convolutional layer's kernel size 
+and number of filters are predetermined. ReLU is the activation function that is used, and this gives the model non-linearity. After the first layer,
+a MaxPooling1D layer is applied to the output to condense the output's spatial dimensions. The output is then reduced to a 2D array and run through
+a single Dense layer with a sigmoid activation function,producing a probability value between 0 and 1 for CNN.
+
+
+train_cnn = pd.read_csv('/kaggle/input/cs985-987-Emotion-Recognition-Project/my_emotion_train.csv')
+
+# Extract the pixel values and emotion labels from the dataframe
+X = np.array([np.fromstring(pixel, dtype=int, sep=' ') for pixel in train_cnn['pixels']])
+y = to_categorical(train_cnn['emotion'], num_classes=7)
+
+# Split the data into training and validation sets
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Reshape the pixel values to images of size 48x48x1
+X_train = X_train.reshape(-1, 48, 48, 1)
+X_val = X_val.reshape(-1, 48, 48, 1)
+
+# Define the CNN model
+model = Sequential()
+model.add(Conv2D(32, (3, 3), activation='relu', input_shape=(48, 48, 1)))
+model.add(MaxPooling2D((2, 2)))
+model.add(Conv2D(64, (3, 3), activation='relu'))
+model.add(MaxPooling2D((2, 2)))
+model.add(Conv2D(128, (3, 3), activation='relu'))
+model.add(MaxPooling2D((2, 2)))
+model.add(Flatten())
+model.add(Dense(128, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(7, activation='softmax'))
+
+# Compile the model
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Train the model
+model.fit(X_train, y_train, batch_size=32, epochs=50, validation_data=(X_val, y_val))
+
+# Load the test data from test.csv
+test_cnn = pd.read_csv('/kaggle/input/cs985-987-Emotion-Recognition-Project/my_emotion_test.csv')
+
+# Extract the pixel values from the test dataframe
+X_test = np.array([np.fromstring(pixel, dtype=int, sep=' ') for pixel in test_cnn['pixels']])
+
+# Reshape the pixel values to images of size 48x48x1
+X_test = X_test.reshape(-1, 48, 48, 1)
+
+# Predict the emotion labels for the test data
+y_pred = model.predict(X_test)
+
+# Convert the predicted probabilities to emotion labels
+y_pred_labels = np.argmax(y_pred, axis=1)
+
+# Save the predicted emotion labels to a CSV file
+test_cnn['emotion'] = y_pred_labels
+test_cnn.to_csv('predictions_cnn.csv', index=False)
+
+
+LSTM
+A deep learning model created to identify emotions from images is included in the code. Long Short-Term Memory (LSTM) networks are used first,
+then a convolutional neural network (CNN), to classify emotions. A dataset with images and the corresponding emotions is used to train and test the model.
+Balance the dataset using Random Oversampling. Convert the image pixels into a numpy array of shape (48,48,1) and normalize it. Split the dataset into training 
+and validation sets. Define the model architecture using a Sequential model from Keras. Compile the model with Adam optimizer and categorical cross-entropy loss.
+Train the model for 50 epochs and validate on the validation set.
+
+
+sampler = RandomOverSampler(sampling_strategy='auto')
+
+x_data, y_data = sampler.fit_resample(x_data.values.reshape(-1,1), y_data)
+print(x_data.shape," ",y_data.shape)
+
+
+x_data = np.array(list(map(str.split, x_data)), np.float32)
+x_data/=255
+x_data[:10]
+
+
+x_data = x_data.reshape(-1, 48, 48, 1)
+x_data.shape
+
+y_data = np.array(y_data)
+y_data = y_data.reshape(y_data.shape[0], 1)
+y_data.shape
+
+
+x_train, x_test, y_train, y_test = train_test_split(x_data, y_data, test_size = 0.3, random_state = 45)
+
+model = Sequential([
+    Input((48, 48, 1)),
+    Conv2D(32, kernel_size=(3,3), strides=(1,1), padding='valid'),
+    BatchNormalization(axis=3),
+    Activation('relu'),
+    Conv2D(64, (3,3), strides=(1,1), padding = 'same'),
+    BatchNormalization(axis=3),
+    Activation('relu'),
+    MaxPooling2D((2,2)),
+    Conv2D(64, (3,3), strides=(1,1), padding = 'valid'),
+    BatchNormalization(axis=3),
+    Activation('relu'),
+    Conv2D(128, (3,3), strides=(1,1), padding = 'same'),
+    BatchNormalization(axis=3),
+    Activation('relu'),
+    MaxPooling2D((2,2)),
+    Conv2D(128, (3,3), strides=(1,1), padding = 'valid'),
+    BatchNormalization(axis=3),
+    Activation('relu'),
+    MaxPooling2D((2,2)),
+    Reshape((-1,128)),
+    (LSTM(128)),
+    (Reshape((-1,64))),
+    LSTM(64),
+#     (Reshape((-1,64)))
+#     (LSTM(32))    
+    Dense(200, activation='relu'),
+    Dropout(0.6),
+    Dense(7, activation = 'softmax')
+])
+model.summary()
+
+
+
+cm = plt.figure(figsize = (4,4))
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+cm.savefig("model_acc")
+plt.show()
+
+# Predict the output 
+y_pred = model.predict(x_test)
+y_result = []
+
+for pred in y_pred:
+    y_result.append(np.argmax(pred))
+y_result[:10]
+
+# Convert the predicted probabilities to emotion labels
+y_pred_labels = np.argmax(y_pred, axis=1)
+
+
+
+LSTM V2
+
+# Load the training data from train.csv
+train_df = pd.read_csv('/kaggle/input/cs985-987-Emotion-Recognition-Project/my_emotion_train.csv')
+
+# Extract the pixel values and emotion labels from the dataframe
+X = np.array([np.fromstring(pixel, dtype=int, sep=' ') for pixel in train_df['pixels']])
+y = to_categorical(train_df['emotion'], num_classes=7)
+
+# Split the data into training and validation sets
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=45)
+
+# Reshape the pixel values to images of size 48x48x1
+X_train = X_train.reshape(-1, 48, 48, 1)
+X_val = X_val.reshape(-1, 48, 48, 1)
+
+# Define the CNN model
+model = Sequential([
+    Input((48, 48, 1)),
+    Conv2D(32, kernel_size=(3,3), strides=(1,1), padding='valid'),
+    BatchNormalization(axis=3),
+    Activation('relu'),
+    Conv2D(64, (3,3), strides=(1,1), padding = 'same'),
+    BatchNormalization(axis=3),
+    Activation('relu'),
+    MaxPooling2D((2,2)),
+    Conv2D(64, (3,3), strides=(1,1), padding = 'valid'),
+    BatchNormalization(axis=3),
+    Activation('relu'),
+    Conv2D(128, (3,3), strides=(1,1), padding = 'same'),
+    BatchNormalization(axis=3),
+    Activation('relu'),
+    MaxPooling2D((2,2)),
+    Conv2D(128, (3,3), strides=(1,1), padding = 'valid'),
+    BatchNormalization(axis=3),
+    Activation('relu'),
+    MaxPooling2D((2,2)),
+    Reshape((-1,128)),
+    (LSTM(128)),
+    (Reshape((-1,64))),
+    LSTM(64),
+    #     (Reshape((-1,64)))
+#     (LSTM(32))    
+    Dense(200, activation='relu'),
+    Dropout(0.25),
+    Dense(7, activation = 'softmax')
+])
+
+
+# Compile the model
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+
+# Specifying parameters for Data Augmentation
+train_datagen = ImageDataGenerator( 
+        rotation_range = 25,  
+        zoom_range = 0.05, 
+        width_shift_range = 0.1,  
+        height_shift_range = 0.1,
+        shear_range = 0.1,
+        horizontal_flip = True,  
+        vertical_flip = False
+        )
+train_datagen.fit(X_train)
+
+from keras.callbacks import ReduceLROnPlateau
+learning_rate_reduction = ReduceLROnPlateau(
+    monitor='val_accuracy', 
+    patience=2, 
+    verbose=1, 
+    factor=0.6, 
+    min_lr=1e-6)
+
+NETult = model.fit(
+    train_datagen.flow(X_train, y_train, batch_size=128),
+    validation_data=(X_val, y_val),
+    epochs=50,
+    verbose=1,
+    callbacks=[learning_rate_reduction])
+
+
+# Load the test data from test.csv
+test_df = pd.read_csv('/kaggle/input/cs985-987-Emotion-Recognition-Project/my_emotion_test.csv')
+
+# Extract the pixel values from the test dataframe
+X_test = np.array([np.fromstring(pixel, dtype=int, sep=' ') for pixel in test_df['pixels']])
+
+# Reshape the pixel values to images of size 48x48x1
+X_test = X_test.reshape(-1, 48, 48, 1)
+
+# Predict the emotion labels for the test data
+y_pred = model.predict(X_test)
+
+# Convert the predicted probabilities to emotion labels
+y_pred_labels = np.argmax(y_pred, axis=1)
+
+# Save the predicted emotion labels to a CSV file
+test_df['emotion'] = y_pred_labels
+test_df.to_csv('predictions.csv', index=False)
+
+
+
+# CNN 3 Layers
+pixels = np.concatenate(train_cnn_3['pixels'])
+labels = train_cnn_3.emotion.values
+
+print(pixels.shape)
+print(labels.shape)
+
+train_dist = (train_cnn_3.emotion.value_counts() / len(train_cnn_3)).to_frame().sort_index(ascending=True).T
+
+train_dist
+
+
+
+X_train, X_valid, y_train, y_valid = train_test_split(
+    pixels, labels, test_size=0.2, stratify=labels, random_state=1
+)
+
+
+print('X_train Shape:', X_train.shape)
+print('y_train Shape:', y_train.shape)
+print()
+print('X_valid Shape:', X_valid.shape)
+print('y_valid Shape:', y_valid.shape)
+
+
+# normalizing 
+Xs_train = X_train / 255
+Xs_valid = X_valid / 255
+
+
+
+np.random.seed(1)
+tf.random.set_seed(1)
+
+base_model = tf.keras.applications.VGG16(
+    input_shape = (48, 48, 1), 
+    include_top = False, 
+    weights = None #'imagenet'
+)
+
+base_model.trainable = False
+
+tf.keras.utils.plot_model(base_model, show_shapes=True)
+
+np.random.seed(1)
+tf.random.set_seed(1)
+
+cnn = Sequential([
+    Conv2D(32, (3,3), activation = 'relu', padding = 'same', input_shape=(48,48,1)),
+    Conv2D(32, (3,3), activation = 'relu', padding = 'same'),
+    MaxPooling2D(2,2),
+    Dropout(0.25),
+    BatchNormalization(),
+    
+    Conv2D(64, (3,3), activation = 'relu', padding = 'same'),
+    Conv2D(64, (3,3), activation = 'relu', padding = 'same'),
+    MaxPooling2D(2,2),
+    Dropout(0.25),
+    BatchNormalization(),
+
+
+    Conv2D(128, (3,3), activation = 'relu', padding = 'same'),
+    Conv2D(128, (3,3), activation = 'relu', padding = 'same'),
+    MaxPooling2D(2,2),
+    Dropout(0.65),
+    BatchNormalization(),
+    
+    Conv2D(64, (3,3), activation = 'relu', padding = 'same'),
+    Conv2D(64, (3,3), activation = 'relu', padding = 'same'),
+    MaxPooling2D(2,2),
+    Dropout(0.25),
+    BatchNormalization(),
+
+    Flatten(),
+    
+    Dense(256, activation='relu'),
+    Dropout(0.25),
+    Dense(128, activation='relu'),
+    Dropout(0.65),
+    Dense(64, activation='relu'),
+    Dropout(0.25),
+    BatchNormalization(),
+    Dense(7, activation='softmax')
+])
+
+cnn.summary()
+
+
+opt = tf.keras.optimizers.Adam(0.001)
+cnn.compile(loss='sparse_categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+%time 
+
+h1 = cnn.fit(
+    Xs_train, y_train, 
+    batch_size = 32,
+    epochs = 50,
+    verbose = 1,
+    validation_data = (Xs_valid, y_valid)
+)
+
+history = h1.history
+print(history.keys())
+
+
+epoch_range = range(1, len(history['loss'])+1)
+
+plt.figure(figsize=[14,4])
+plt.subplot(1,2,1)
+plt.plot(epoch_range, history['loss'], label='Training')
+plt.plot(epoch_range, history['val_loss'], label='Validation')
+plt.xlabel('Epoch'); plt.ylabel('Loss'); plt.title('Loss')
+plt.legend()
+plt.subplot(1,2,2)
+plt.plot(epoch_range, history['accuracy'], label='Training')
+plt.plot(epoch_range, history['val_accuracy'], label='Validation')
+plt.xlabel('Epoch'); plt.ylabel('Accuracy'); plt.title('Accuracy')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+epoch_range = range(1, len(history['loss'])+1)
+
+plt.figure(figsize=[14,4])
+plt.subplot(1,2,1)
+plt.plot(epoch_range, history['loss'], label='Training')
+plt.plot(epoch_range, history['val_loss'], label='Validation')
+plt.xlabel('Epoch'); plt.ylabel('Loss'); plt.title('Loss')
+plt.legend()
+plt.subplot(1,2,2)
+plt.plot(epoch_range, history['accuracy'], label='Training')
+plt.plot(epoch_range, history['val_accuracy'], label='Validation')
+plt.xlabel('Epoch'); plt.ylabel('Accuracy'); plt.title('Accuracy')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+%time 
+
+h3 = cnn.fit(
+    Xs_train, y_train, 
+    batch_size=128,
+    epochs = 100,
+    verbose = 1,
+    validation_data = (Xs_valid, y_valid)
+)
+
+for k in history.keys():
+    history[k] += h3.history[k]
+
+epoch_range = range(1, len(history['loss'])+1)
+
+plt.figure(figsize=[14,4])
+plt.subplot(1,2,1)
+plt.plot(epoch_range, history['loss'], label='Training')
+plt.plot(epoch_range, history['val_loss'], label='Validation')
+plt.xlabel('Epoch'); plt.ylabel('Loss'); plt.title('Loss')
+plt.legend()
+plt.subplot(1,2,2)
+plt.plot(epoch_range, history['accuracy'], label='Training')
+plt.plot(epoch_range, history['val_accuracy'], label='Validation')
+plt.xlabel('Epoch'); plt.ylabel('Accuracy'); plt.title('Accuracy')
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+
+# Extract the pixel values from the test dataframe
+X_test = np.array([np.fromstring(pixels, dtype=int, sep=' ') for pixels in train_cnn_3['pixels']])
+
+# Reshape the pixel values to images of size 48x48x1
+img_array_test = test_df.pixels.apply(lambda x: np.array(x.split(' ')).reshape(-1, 48, 48, 1).astype('float32'))
+img_array_test = np.stack(img_array_test, axis=0)
+
+# Reshape the pixel values to images of size 48x48x1
+X_test = X_test.reshape(-1, 48, 48, 1)
+
+# Predict the emotion labels for the test data
+y_pred = model.predict(X_test)
+
+# Convert the predicted probabilities to emotion labels
+y_pred_labels = np.argmax(y_pred, axis=1)
+
+# Save the predicted emotion labels to a CSV file
+test_df['emotion'] = y_pred_labels
+test_df.to_csv('submission-cnn3.csv', index=False)# Save the predicted emotion labels to a CSV file
+test_df['emotion'] = y_pred_labels
+test_df.to_csv('submission-cnn3.csv', index=False)
+
+
+
+KNN :
+
+ from sklearn.neighbors import KNeighborsClassifier 
+ 
+ # Extract the pixel values and emotion labels from the dataframe
+X = np.array([np.fromstring(pixel, dtype=int, sep=' ') for pixel in train_knn['pixels']])
+y = to_categorical(train_knn['emotion'], num_classes=7)
+
+
+# Split the data into training and validation sets
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.1, random_state=10)
+
+
+knn.fit(X_train, y_train) 
+predKNN= knn.predict(X_train)
+
+
+acc_scoreSVM = accuracy_score(y_train,predKNN )*100
+print('Accuracy of Support Vector Machine: ', acc_scoreSVM, "%")
+
+
+
+Dense Net Model
+
+
+ base_model = DenseNet121(weights='imagenet', include_top=False)
+ x = base_model.output
+x = GlobalAveragePooling2D()(x)
+x = Dense(128, activation='relu')(x)
+predictions = Dense(7, activation='softmax')(x)
+
+
+# Freeze the weights of the base model and compile the model:
+for layer in base_model.layers:
+    layer.trainable = False
+
+model.compile(optimizers.Adam(0.001),
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+              
+X_train, X_valid, y_train, y_valid = train_test_split(
+    pixels, labels, test_size=0.2, stratify=labels, random_state=1
+)
+
+
+
+
+
+Dense_Net= model.fit(X_train, y_train, validation_data=(X_valid, y_valid),epochs = 30,batch_size= 32)
+
+# Predict the emotion labels for the test data
+y_pred = model.predict(X_test)
+
+# Save the predicted emotion labels to a CSV file
+test_df['emotion'] = y_pred_labels
+test_df.to_csv('submission-dens.csv', index=False)
+
+
+
+
+
+
+
+
